@@ -31,7 +31,6 @@ class Chat(BaseModel):
     session_id = CharField()
     message = JSONField()
     model_used = CharField()
-    prompt_version_id = CharField()
     rating = IntegerField()
     feedback = CharField()
     action = CharField()
