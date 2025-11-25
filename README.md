@@ -28,7 +28,6 @@
 - `Session` => Table to maintain chat sessions
 - `Chat` => This table will store all the messages from the user.
 - `Prompt` => This table will store all the prompts
-- `PromptVersion` => This table will store all the calibrated prompts from the base version
 
 ## Table Structure:
 
@@ -36,4 +35,3 @@ User: id, name, email, password
 Session: id, user_id , session_name
 Chat: id, session_id, role, content , model_used , prompt_version_id , rating, feedback_text, action, created_at
 Prompt: id, name, base_prompt, current_version_id
-PromptVersion: id, prompt_id, version_number, calibrated_prompt, created_at
