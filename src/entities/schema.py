@@ -61,4 +61,9 @@ class LLMFeedbackInput(BaseModel):
 class LLMFeedbackOutput(BaseModel):
     calibrated_system_prompt: str
 
+class SessionInfo(BaseModel):
+    id: str
+    user_id: str
+    session_name: str
+
 

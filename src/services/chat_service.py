@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import List
 
@@ -8,7 +9,7 @@ from src.entities.db_model import Session, Chat
 from src.entities.schema import (
     UserChatRequest, ChatFeedback, FeedbackAction,
     NewChatSession, LLMFeedbackInput,
-    LLMFeedbackOutput, ChatHistoryItem
+    LLMFeedbackOutput, ChatHistoryItem, SessionInfo
 )
 from src.utils.llm_utils import client
 
@@ -62,10 +63,25 @@ async def create_chat_with_response(session_id: str, user_message: str, assistan
     return chat
 
 
-async def get_session_history(session_id: str) -> List[ChatHistoryItem]:
+async def get_session_history(user_id: str) -> List[SessionInfo]:
+
+    query = Session.select().where(Session.user_id == user_id)
+
+    sessions = []
+    for session in query:
+        sessions.append(SessionInfo(
+            id=str(session.id),
+            user_id=str(session.user_id),
+            session_name=session.session_name
+        ))
+
+    return sessions
+
+
+async def get_chat_history_in_session(session_id: str) -> List[ChatHistoryItem]:
 
     await validate_session(session_id)
-    query = Chat.select().where(Chat.session_id == str(session_id)).order_by(Chat.created_at)
+    query = Chat.select().where(Chat.session_id == str(session_id))
 
     history = []
     for chat in query:
@@ -76,11 +92,9 @@ async def get_session_history(session_id: str) -> List[ChatHistoryItem]:
             model_used=chat.model_used,
             rating=chat.rating,
             feedback=chat.feedback,
-            created_at=str(chat.created_at) if hasattr(chat, 'created_at') else None
         ))
 
     return history
-
 
 async def update_chat_feedback(chat_id: str, feedback: ChatFeedback,
                                action: FeedbackAction = None) -> dict:
@@ -117,6 +131,9 @@ async def act_on_feedback(request: LLMFeedbackInput) -> LLMFeedbackOutput:
             }
         ]
     )
+    response = json.loads(response.choices[0].message.content)
+    prompt = response["calibrated_system_prompt"]
+    
     return LLMFeedbackOutput(
-        calibrated_system_prompt=response.choices[0].message.content
+        calibrated_system_prompt=prompt
     )
