@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from src.entities.schema import UserRegister, UserLogin
 from src.services.user_service import user_register, user_login
+from src.utils.auth_utils import get_current_user
 
 users_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -16,5 +17,5 @@ async def login(user_data: UserLogin):
     return response
 
 @users_router.post("/logout")
-async def logout():
-    return {"message": "Logged out"}
+async def logout(user = Depends(get_current_user)):
+    return {"message": "Logged out", "user_id": user.id}

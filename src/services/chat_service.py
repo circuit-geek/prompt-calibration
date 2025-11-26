@@ -6,10 +6,9 @@ import ollama
 from src.constants.properties import GPT_MODEL
 from src.entities.db_model import Session, Chat
 from src.entities.schema import (
-    UserChatRequest, ChatResponse,
-    ChatFeedback, FeedbackAction,
-    NewChatSession, ChatObject,
-    LLMFeedbackInput, LLMFeedbackOutput
+    UserChatRequest, ChatFeedback, FeedbackAction,
+    NewChatSession, LLMFeedbackInput,
+    LLMFeedbackOutput, ChatHistoryItem
 )
 from src.utils.llm_utils import client
 
@@ -24,7 +23,7 @@ async def validate_session(session_id: str) -> Session:
         raise ValueError(f"Session not found: {session_id}")
     return session
 
-async def generate_response(request: UserChatRequest) -> ChatResponse:
+async def generate_response(request: UserChatRequest) -> str:
     installed_models = ollama.list().models
     installed_model_names = [m.model for m in installed_models]
 
@@ -42,32 +41,49 @@ async def generate_response(request: UserChatRequest) -> ChatResponse:
         ],
         stream=False
     )
-    return ChatResponse(
-        message=response.message.content
-    )
+    return response.message.content
 
 
-async def add_chat_to_session(chat_object: ChatObject) -> Chat:
-    await validate_session(chat_object.session_id)
+async def create_chat_with_response(session_id: str, user_message: str, assistant_message: str,
+                                    model_used: str, prompt_version_id: str = None) -> Chat:
+
+    await validate_session(session_id)
+
     chat = Chat.create(
-        session_id=str(chat_object.session_id),
-        message=chat_object.message,
-        model_used=chat_object.model_used,
-        prompt_version_id=chat_object.prompt_version_id,
-        rating=chat_object.rating,
-        feedback=chat_object.feedback,
-        action=chat_object.action
+        session_id=str(session_id),
+        user_message=user_message,
+        assistant_message=assistant_message,
+        model_used=model_used,
+        prompt_version_id=prompt_version_id,
+        rating=None,
+        feedback=None,
+        action=None
     )
     return chat
 
 
-async def get_session_history(session_id: str) -> List[Chat]:
-    await validate_session(session_id)
-    query = Chat.select().where(Chat.session_id == str(session_id))
-    return list(query)
+async def get_session_history(session_id: str) -> List[ChatHistoryItem]:
 
-async def give_response_feedback(chat_id: str, feedback: ChatFeedback,
-                                 action: FeedbackAction, request: LLMFeedbackInput):
+    await validate_session(session_id)
+    query = Chat.select().where(Chat.session_id == str(session_id)).order_by(Chat.created_at)
+
+    history = []
+    for chat in query:
+        history.append(ChatHistoryItem(
+            id=str(chat.id),
+            user_message=chat.user_message,
+            assistant_message=chat.assistant_message,
+            model_used=chat.model_used,
+            rating=chat.rating,
+            feedback=chat.feedback,
+            created_at=str(chat.created_at) if hasattr(chat, 'created_at') else None
+        ))
+
+    return history
+
+
+async def update_chat_feedback(chat_id: str, feedback: ChatFeedback,
+                               action: FeedbackAction = None) -> dict:
 
     chat = Chat.get_or_none(Chat.id == chat_id)
     if not chat:
@@ -75,11 +91,10 @@ async def give_response_feedback(chat_id: str, feedback: ChatFeedback,
 
     chat.rating = feedback.rating
     chat.feedback = feedback.feedback
+    if action:
+        chat.action = action.value
 
-    if action.NO_ACTION_NEEDED.value:
-        print("No action needed continuing to next query")
-    elif action.CALIBRATE_PROMPT.value:
-        await act_on_feedback(request=request)
+    chat.save()
 
     return {
         "chat_id": str(chat.id),
@@ -88,10 +103,12 @@ async def give_response_feedback(chat_id: str, feedback: ChatFeedback,
         "action": chat.action
     }
 
+
 async def act_on_feedback(request: LLMFeedbackInput) -> LLMFeedbackOutput:
+
     system_prompt = Path("src/prompts/calibrator_system_prompt.jinja").read_text()
     response = client.chat.completions.create(
-        model = GPT_MODEL,
+        model=GPT_MODEL,
         messages=[
             {
                 "role": "system",

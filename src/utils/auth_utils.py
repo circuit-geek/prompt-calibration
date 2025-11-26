@@ -19,7 +19,7 @@ security = HTTPBearer()
 
 def create_access_token(user: User):
     expire_time = datetime.datetime.now(datetime.UTC) + timedelta(days=30)
-    token_data = {"sub": str(user.user_id), "exp": expire_time}
+    token_data = {"sub": str(user.id), "exp": expire_time}
     access_token = jwt.encode(token_data, SECRET_ACCESS_TOKEN, algorithm=SECRET_ALGORITHM)
     return access_token
 

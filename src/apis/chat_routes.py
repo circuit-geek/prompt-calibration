@@ -1,20 +1,22 @@
 from fastapi import APIRouter, Depends
-from src.utils.auth_utils import get_current_user
+
 from src.entities.schema import (
     NewChatSession, UserChatRequest,
-    ChatObject, ChatFeedback,
-    LLMFeedbackInput
+    ChatResponse, ChatFeedback,
+    FeedbackAction, LLMFeedbackInput
 )
 from src.services.chat_service import (
     create_new_session, generate_response,
-    add_chat_to_session, get_session_history,
-    give_response_feedback
+    get_session_history, create_chat_with_response,
+    update_chat_feedback, act_on_feedback
 )
+from src.utils.auth_utils import get_current_user
 
 chat_router = APIRouter(prefix="/chat", tags=["Chat"])
 
 @chat_router.post("/session/create")
 async def create_session_route(new_chat: NewChatSession, user=Depends(get_current_user)):
+    new_chat.user_id = user.id
     session = await create_new_session(new_chat)
     return {"session_id": str(session.id), "session_name": session.session_name}
 
@@ -28,43 +30,36 @@ async def get_history_route(session_id: str, user=Depends(get_current_user)):
 @chat_router.post("/session/{session_id}/send")
 async def send_message_route(session_id: str,
                              request: UserChatRequest, user=Depends(get_current_user)):
-    user_chat = ChatObject(
+
+    assistant_message = await generate_response(request)
+    saved_chat = await create_chat_with_response(
         session_id=session_id,
-        message=request.user_prompt,
-        model_used=request.model,
-        rating=None,
-        feedback=None,
-        action=None,
+        user_message=request.user_prompt,
+        assistant_message=assistant_message,
+        model_used=request.model
     )
-    await add_chat_to_session(user_chat)
-    llm_response = await generate_response(request)
-    assistant_chat = ChatObject(
-        session_id=session_id,
-        message=llm_response.message,
-        model_used=request.model,
-        rating=None,
-        feedback=None,
-        action=None,
+
+    return ChatResponse(
+        message=assistant_message,
+        chat_id=str(saved_chat.id)
     )
-    saved_chat = await add_chat_to_session(assistant_chat)
-
-    return {
-        "response": llm_response,
-        "assistant_chat_id": str(saved_chat.id)
-    }
 
 
+@chat_router.post("/chat/{chat_id}/feedback")
+async def submit_feedback_route(chat_id: str, feedback: ChatFeedback,
+                                user=Depends(get_current_user)):
 
-@chat_router.post("/{chat_id}/feedback")
-async def feedback_route(chat_id: str, feedback: ChatFeedback,
-                         request: LLMFeedbackInput, user=Depends(get_current_user)):
+    result = await update_chat_feedback(chat_id, feedback, feedback.action)
+    if feedback.action == FeedbackAction.CALIBRATE_PROMPT:
+        feedback_input = LLMFeedbackInput(
+            rating=feedback.rating,
+            feedback=feedback.feedback,
+            base_system_prompt=feedback.base_system_prompt
+        )
 
-    result = await give_response_feedback(
-        chat_id=chat_id,
-        feedback=feedback,
-        action=feedback.action,
-        request=request,
-    )
+        calibrated = await act_on_feedback(feedback_input)
+        result["calibrated_prompt"] = calibrated.calibrated_system_prompt
+
     return result
 
 

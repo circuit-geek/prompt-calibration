@@ -28,23 +28,25 @@ class Session(BaseModel):
 
 class Chat(BaseModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4)
-    session_id = CharField()
-    message = JSONField()
-    model_used = CharField()
-    rating = IntegerField()
-    feedback = CharField()
-    action = CharField()
+    session_id = CharField(null=True)
+    user_message = TextField(null=True)
+    assistant_message = TextField(null=True)
+    model_used = CharField(null=True)
+    prompt_version_id = CharField(null=True)
+    rating = IntegerField(null=True)
+    feedback = CharField(null=True)
+    action = CharField(null=True)
 
     def save(self, *args, **kwargs):
         return super(Chat, self).save(*args, **kwargs)
 
 class Prompt(BaseModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4)
-    name = CharField()
-    base_prompt = CharField()
-    current_prompt = CharField()
-    version_number = IntegerField()
-    calibrated_prompts = JSONField()
+    name = CharField(null=True)
+    base_prompt = CharField(null=True)
+    current_prompt = CharField(null=True)
+    version_number = IntegerField(null=True)
+    calibrated_prompts = JSONField(null=True)
 
     def save(self, *args, **kwargs):
         return super(Prompt, self).save(*args, **kwargs)

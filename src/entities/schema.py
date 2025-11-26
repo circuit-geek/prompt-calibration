@@ -2,14 +2,18 @@ from pydantic import BaseModel
 from enum import Enum
 from typing import Optional
 
+class FeedbackAction(str, Enum):
+    CALIBRATE_PROMPT = "calibrate_prompt"
+    NO_ACTION_NEEDED = "no_action_needed"
+
 class UserModel(BaseModel):
     user_id: str
     name: str
-    email: str
+    email_id: str
 
 class UserRegister(BaseModel):
     name: str
-    email: str
+    email_id: str
     password: str
 
 class UserRegisterSuccess(BaseModel):
@@ -28,27 +32,26 @@ class UserChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     message: str
+    chat_id: str
 
 class ChatFeedback(BaseModel):
     rating: int
     feedback: str
+    action: FeedbackAction = FeedbackAction.NO_ACTION_NEEDED
+    base_system_prompt: Optional[str] = None
 
 class NewChatSession(BaseModel):
     user_id: str
     chat_name: str
 
-class FeedbackAction(str, Enum):
-    CALIBRATE_PROMPT = "calibrate_prompt"
-    NO_ACTION_NEEDED = "no_action_needed"
-
-class ChatObject(BaseModel):
-    session_id: str
-    message: str
+class ChatHistoryItem(BaseModel):
+    id: str
+    user_message: str
+    assistant_message: str
     model_used: Optional[str] = None
-    prompt_version_id: Optional[str] = None
     rating: Optional[int] = None
     feedback: Optional[str] = None
-    action: Optional[str] = None
+    created_at: Optional[str] = None
 
 class LLMFeedbackInput(BaseModel):
     rating: int
