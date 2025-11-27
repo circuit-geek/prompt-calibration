@@ -26,10 +26,14 @@ async def create_session_route(new_chat: NewChatSession, user=Depends(get_curren
 async def send_message_route(session_id: str,
                              request: UserChatRequest, user=Depends(get_current_user)):
 
-    assistant_message = await generate_response(request)
     prompt = Prompt.get_or_none(Prompt.session_id == session_id)
-
     session = Session.get_or_none(Session.id == session_id)
+
+    system_prompt = session.current_prompt or request.base_system_prompt
+    request.base_system_prompt = system_prompt
+
+    assistant_message = await generate_response(request)
+
     session.current_prompt = request.base_system_prompt
     session.model_name = request.model
     session.save()
