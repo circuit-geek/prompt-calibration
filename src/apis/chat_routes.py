@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from src.entities.db_model import Chat, Prompt, Session
 from src.entities.schema import (
     NewChatSession, UserChatRequest,
     ChatResponse, ChatFeedback,
@@ -8,7 +9,8 @@ from src.entities.schema import (
 from src.services.chat_service import (
     create_new_session, generate_response,
     get_session_history, create_chat_with_response,
-    update_chat_feedback, act_on_feedback, get_chat_history_in_session
+    update_chat_feedback, act_on_feedback,
+    get_chat_history_in_session, prompt_updater
 )
 from src.utils.auth_utils import get_current_user
 
@@ -25,6 +27,21 @@ async def send_message_route(session_id: str,
                              request: UserChatRequest, user=Depends(get_current_user)):
 
     assistant_message = await generate_response(request)
+    prompt = Prompt.get_or_none(Prompt.session_id == session_id)
+
+    session = Session.get_or_none(Session.id == session_id)
+    session.current_prompt = request.base_system_prompt
+    session.model_name = request.model
+    session.save()
+
+    if not prompt:
+        Prompt.create(
+            session_id = session_id,
+            base_prompt = request.base_system_prompt,
+            current_prompt = request.base_system_prompt,
+            calibrated_system_prompt = []
+        )
+
     saved_chat = await create_chat_with_response(
         session_id=session_id,
         user_message=request.user_prompt,
@@ -52,6 +69,10 @@ async def submit_feedback_route(chat_id: str, feedback: ChatFeedback,
 
         calibrated = await act_on_feedback(feedback_input)
         result["calibrated_prompt"] = calibrated.calibrated_system_prompt
+        chat = Chat.get_or_none(Chat.id == chat_id)
+        session_id = chat.session_id
+        await prompt_updater(calibrated_system_prompt=result["calibrated_prompt"],
+                             session_id=session_id)
     return result
 
 @chat_router.get("/session/history")

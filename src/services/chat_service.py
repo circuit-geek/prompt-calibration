@@ -5,7 +5,7 @@ from typing import List
 import ollama
 
 from src.constants.properties import GPT_MODEL
-from src.entities.db_model import Session, Chat
+from src.entities.db_model import Session, Chat, Prompt
 from src.entities.schema import (
     UserChatRequest, ChatFeedback, FeedbackAction,
     NewChatSession, LLMFeedbackInput,
@@ -45,17 +45,15 @@ async def generate_response(request: UserChatRequest) -> str:
     return response.message.content
 
 
-async def create_chat_with_response(session_id: str, user_message: str, assistant_message: str,
-                                    model_used: str, prompt_version_id: str = None) -> Chat:
+async def create_chat_with_response(session_id: str, user_message: str,
+                                    assistant_message: str, model_used: str) -> Chat:
 
     await validate_session(session_id)
-
     chat = Chat.create(
         session_id=str(session_id),
         user_message=user_message,
         assistant_message=assistant_message,
         model_used=model_used,
-        prompt_version_id=prompt_version_id,
         rating=None,
         feedback=None,
         action=None
@@ -72,7 +70,9 @@ async def get_session_history(user_id: str) -> List[SessionInfo]:
         sessions.append(SessionInfo(
             id=str(session.id),
             user_id=str(session.user_id),
-            session_name=session.session_name
+            session_name=session.session_name,
+            model_name=session.model_name,
+            current_prompt=session.current_prompt
         ))
 
     return sessions
@@ -137,3 +137,18 @@ async def act_on_feedback(request: LLMFeedbackInput) -> LLMFeedbackOutput:
     return LLMFeedbackOutput(
         calibrated_system_prompt=prompt
     )
+
+async def prompt_updater(calibrated_system_prompt: str, session_id: str):
+    prompt = Prompt.get_or_none(Prompt.session_id == session_id)
+    session = Session.get_or_none(Session.id == session_id)
+
+    prompt.current_prompt = calibrated_system_prompt
+    session.current_prompt = calibrated_system_prompt
+
+    calibrated = prompt.calibrated_prompts if prompt.calibrated_prompts else []
+    calibrated.append(calibrated_system_prompt)
+    prompt.calibrated_prompts = calibrated
+
+    prompt.save()
+    session.save()
+    return prompt

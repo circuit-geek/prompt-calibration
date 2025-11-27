@@ -22,6 +22,8 @@ class Session(BaseModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4)
     user_id = CharField()
     session_name = CharField(default="new-chat")
+    model_name = CharField(null=True)
+    current_prompt = CharField(null=True)
 
     def save(self, *args, **kwargs):
         return super(Session, self).save(*args, **kwargs)
@@ -32,7 +34,6 @@ class Chat(BaseModel):
     user_message = TextField(null=True)
     assistant_message = TextField(null=True)
     model_used = CharField(null=True)
-    prompt_version_id = CharField(null=True)
     rating = IntegerField(null=True)
     feedback = CharField(null=True)
     action = CharField(null=True)
@@ -42,11 +43,10 @@ class Chat(BaseModel):
 
 class Prompt(BaseModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4)
-    name = CharField(null=True)
+    session_id = CharField()
     base_prompt = CharField(null=True)
     current_prompt = CharField(null=True)
-    version_number = IntegerField(null=True)
-    calibrated_prompts = JSONField(null=True)
+    calibrated_prompts = JSONField(null=True, default=list)
 
     def save(self, *args, **kwargs):
         return super(Prompt, self).save(*args, **kwargs)

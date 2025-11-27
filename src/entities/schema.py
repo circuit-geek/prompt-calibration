@@ -65,5 +65,7 @@ class SessionInfo(BaseModel):
     id: str
     user_id: str
     session_name: str
+    model_name: str
+    current_prompt: str
 
 
