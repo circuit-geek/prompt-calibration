@@ -51,7 +51,6 @@ class ChatHistoryItem(BaseModel):
     model_used: Optional[str] = None
     rating: Optional[int] = None
     feedback: Optional[str] = None
-    created_at: Optional[str] = None
 
 class LLMFeedbackInput(BaseModel):
     rating: int

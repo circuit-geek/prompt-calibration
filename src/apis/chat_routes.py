@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends
 
-from src.entities.db_model import Chat, Prompt, Session
+from src.entities.db_model import Chat
 from src.entities.schema import (
     NewChatSession, UserChatRequest,
     ChatResponse, ChatFeedback,
     FeedbackAction, LLMFeedbackInput
 )
 from src.services.chat_service import (
-    create_new_session, generate_response,
-    get_session_history, create_chat_with_response,
+    create_new_session, get_session_history, create_chat_with_response,
     update_chat_feedback, act_on_feedback,
     get_chat_history_in_session, prompt_updater
 )
@@ -26,32 +25,13 @@ async def create_session_route(new_chat: NewChatSession, user=Depends(get_curren
 async def send_message_route(session_id: str,
                              request: UserChatRequest, user=Depends(get_current_user)):
 
-    prompt = Prompt.get_or_none(Prompt.session_id == session_id)
-    session = Session.get_or_none(Session.id == session_id)
-
-    system_prompt = session.current_prompt or request.base_system_prompt
-    request.base_system_prompt = system_prompt
-
-    assistant_message = await generate_response(request)
-
-    session.current_prompt = request.base_system_prompt
-    session.model_name = request.model
-    session.save()
-
-    if not prompt:
-        Prompt.create(
-            session_id = session_id,
-            base_prompt = request.base_system_prompt,
-            current_prompt = request.base_system_prompt,
-            calibrated_system_prompt = []
-        )
-
     saved_chat = await create_chat_with_response(
         session_id=session_id,
         user_message=request.user_prompt,
-        assistant_message=assistant_message,
-        model_used=request.model
+        model_used=request.model,
+        request=request
     )
+    assistant_message = saved_chat.assistant_message
 
     return ChatResponse(
         message=assistant_message,

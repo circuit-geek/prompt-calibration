@@ -46,9 +46,30 @@ async def generate_response(request: UserChatRequest) -> str:
 
 
 async def create_chat_with_response(session_id: str, user_message: str,
-                                    assistant_message: str, model_used: str) -> Chat:
+                                    model_used: str, request: UserChatRequest) -> Chat:
 
     await validate_session(session_id)
+
+    prompt = Prompt.get_or_none(Prompt.session_id == session_id)
+    session = Session.get_or_none(Session.id == session_id)
+
+    system_prompt = session.current_prompt or request.base_system_prompt
+    request.base_system_prompt = system_prompt
+
+    assistant_message = await generate_response(request)
+
+    session.current_prompt = request.base_system_prompt
+    session.model_name = request.model
+    session.save()
+
+    if not prompt:
+        Prompt.create(
+            session_id = session_id,
+            base_prompt = request.base_system_prompt,
+            current_prompt = request.base_system_prompt,
+            calibrated_system_prompt = []
+        )
+
     chat = Chat.create(
         session_id=str(session_id),
         user_message=user_message,
@@ -100,11 +121,9 @@ async def update_chat_feedback(chat_id: str, feedback: ChatFeedback,
                                action: FeedbackAction = None) -> dict:
 
     chat = Chat.get_or_none(Chat.id == chat_id)
-    if not chat:
-        raise ValueError(f"Chat not found: {chat_id}")
-
     chat.rating = feedback.rating
     chat.feedback = feedback.feedback
+
     if action:
         chat.action = action.value
 
