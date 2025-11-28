@@ -26,7 +26,7 @@
 
 User: id, name, email, password
 Session: id, user_id , session_name, current_prompt, model_name
-Chat: id, session_id, role, content , model_used, rating, feedback_text, action
+Chat: id, session_id, user_message, assistant_message, model_used, rating, feedback, action
 Prompt: id, base_prompt, current_prompt, calibrated_prompts
 
 ### Steps to run:
